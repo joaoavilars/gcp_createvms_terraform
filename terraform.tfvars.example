@@ -1,0 +1,67 @@
+# Id do Projeto
+project_id     = "meu-projeto-gcp-123"
+
+# Região e Zona
+region         = "us-central1"
+zone           = "us-central1-a"
+
+# Nome da VM
+vm_name        = "minha-vm-producao"
+
+# ================================================================================
+# TIPO DE MÁQUINA (Predefinição, CPUs e RAM)
+# 
+# Dica de CLI: Para listar as máquinas disponíveis na sua zona atual via terminal, rode:
+# $ gcloud compute machine-types list --filter="zone:us-central1-a"
+#
+# Você pode usar os tipos padrões do GCP ou criar "Máquinas Customizadas"
+# quando precisar de configurações específicas (ex: pouca CPU e muita RAM).
+# 
+# 1. Modelos Predefinidos (Standard, High-Memory, High-CPU, etc):
+#    - "e2-standard-4" (4 vCPUs, 16 GB RAM)
+#    - "n4-standard-4" (4 vCPUs, 16 GB RAM)
+#    - "e2-micro"      (2 vCPUs compartilhados, 1 GB RAM)
+#
+# 2. Modelos Customizados (CPUs e RAM sob medida):
+#    A fórmula é: <familia>-custom-<VCPUS>-<RAM_EM_MB>
+#    Importante: A memória (RAM) deve ser sempre calculada em Megabytes (GB * 1024).
+#    
+#    Exemplos de Modelos Customizados:
+#    - "e2-custom-2-12288" (E2 com 2 vCPUs e 12 GB de RAM)
+#    - "n2-custom-4-32768" (N2 com 4 vCPUs e 32 GB de RAM)
+#    - "n4-custom-2-10240" (N4 com 2 vCPUs e 10 GB de RAM)
+#    
+#    Atenção à família N1 vs 1 vCPU:
+#    - Se você precisar de exatamente "1 CPU" com muita memória (ex: 1 CPU e 12GB RAM),
+#      a única família que permite Custom com 1 CPU é a antiga N1.
+#      A sintaxe da N1 *não leva* prefixo, ficando assim: "custom-1-12288"
+#      As famílias mais novas (E2, N2, N4) exigem no mínimo 2 vCPUs no modo custom.
+#
+# ================================================================================
+machine_type   = "e2-standard-4"
+
+# Sistema Operacional (Ubuntu LTS)
+# Para garantir sempre a versão LTS do Ubuntu (ex: 20.04, 22.04, 24.04).
+# A branch "ubuntu-2404-lts" pega sempre a imagem segura mais atualizada vinda da Canonical.
+# Comando CLI para listar imagens do Ubuntu disponíveis:
+# $ gcloud compute images list --project ubuntu-os-cloud --no-standard-images
+os_image       = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
+
+# Tamanho e Tipo de Disco
+boot_disk_size = 50
+
+# ======= MATRIZ DE COMPATIBILIDADE DE DISCOS ========
+#
+# pd-balanced / pd-ssd / pd-standard:
+#   - Compatíveis com instâncias gerais: E2, N1, N2, N2D, C2, T2D, etc.
+#   - INCOMPATÍVEIS com a nova geração N4, C3, M3.
+#
+# hyperdisk-balanced / hyperdisk-extreme:
+#   - Compatíveis SOMENTE com instâncias modernas como N4, C3 e M3.
+#   - INCOMPATÍVEIS com instâncias antigas ou populares como E2, N2, N1.
+# 
+# ====================================================
+boot_disk_type = "pd-balanced" # Lembre de referenciar a lista acima para o tipo correto.
+
+# Chaves SSH fornecidas
+ssh_key        = "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... admin@dominiodaempresa.com"

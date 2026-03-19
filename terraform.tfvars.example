@@ -65,3 +65,12 @@ boot_disk_type = "pd-balanced" # Lembre de referenciar a lista acima para o tipo
 
 # Chaves SSH fornecidas
 ssh_key        = "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... admin@dominiodaempresa.com"
+
+# ================================================================================
+# ALERTAS DO TELEGRAM
+# ================================================================================
+# Deixe enable_telegram_alerts = true para receber notificações de início, erros 
+# e sucesso do processo de criação da VM.
+enable_telegram_alerts = false
+telegram_bot_token     = "SEU_TOKEN_AQUI"
+telegram_chat_id       = "SEU_CHAT_ID_AQUI"

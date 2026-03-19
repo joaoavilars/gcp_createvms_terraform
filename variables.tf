@@ -46,3 +46,21 @@ variable "ssh_key" {
   description = "Chave SSH Pública a ser inserida ('usuario:ssh-rsa AAAAB3...')"
   type        = string
 }
+
+variable "enable_telegram_alerts" {
+  description = "Ativar envio de alertas para o Telegram (true ou false)"
+  type        = bool
+  default     = false
+}
+
+variable "telegram_bot_token" {
+  description = "Token do seu Bot do Telegram (gerado pelo BotFather)"
+  type        = string
+  default     = ""
+}
+
+variable "telegram_chat_id" {
+  description = "ID do Chat/Grupo do Telegram para enviar os alertas"
+  type        = string
+  default     = ""
+}

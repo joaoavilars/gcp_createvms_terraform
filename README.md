@@ -35,9 +35,32 @@ Este repositório contém a infraestrutura como código (IaC) em Terraform para 
    ```
 
 5. **Aplicar as Alterações (Deploy):**
+   Para realizar o provisionamento padrão, execute:
    ```bash
    terraform apply
    ```
+   *(Nota: Se você configurou os Alertas do Telegram, veja a seção abaixo sobre como utilizar os scripts wrapper na hora do deploy).*
+
+## Alertas via Telegram (Opcional)
+
+Você pode receber notificações automáticas no seu Telegram sempre que o processo de provisionamento iniciar, for concluído com sucesso ou apresentar falhas técnicas.
+
+**Como configurar e executar:**
+1. No seu arquivo `terraform.tfvars`, adicione as três variáveis e preencha com os dados reais do seu bot:
+   ```hcl
+   enable_telegram_alerts = true
+   telegram_bot_token     = "SEU_TOKEN_AQUI"
+   telegram_chat_id       = "SEU_CHAT_ID_AQUI"
+   ```
+2. Na hora do Deploy, ao invés de rodar `terraform apply` manualmente, utilize os scripts integrados na raiz do projeto. Eles se encarregam de disparar o Terraform e analisar os logs:
+   - Usuários de Windows (PowerShell):
+     ```powershell
+     .\deploy_vm.ps1
+     ```
+   - Usuários de Linux, macOS, WSL ou Git Bash:
+     ```bash
+     bash deploy_vm.sh
+     ```
 
 ## Estrutura de Diretório
 - `main.tf`: Definição dos blocos do Google Compute Engine (Instância e IP Fixo).

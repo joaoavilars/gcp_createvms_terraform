@@ -64,6 +64,7 @@ boot_disk_size = 50
 boot_disk_type = "pd-balanced" # Lembre de referenciar a lista acima para o tipo correto.
 
 # Chaves SSH fornecidas
+# Observe que o usuario deve vir antes dos dois pontos, assim ele será criado na VM automaticamente
 ssh_key        = "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... admin@dominiodaempresa.com"
 
 # ================================================================================

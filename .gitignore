@@ -9,6 +9,7 @@
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
+.terraform.lock.hcl
 
 # Planos de execução gerados pelo terraform plan
 *.tfplan

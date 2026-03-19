@@ -9,17 +9,21 @@ if [ ! -f "$TFVARS_FILE" ]; then
 fi
 
 # Extrair variáveis do terraform.tfvars
-ENABLE_ALERTS=$(grep -iE 'enable_telegram_alerts[[:space:]]*=[[:space:]]*(true|false)' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*(true|false).*/\1/' | tr '[:upper:]' '[:lower:]')
-BOT_TOKEN=$(grep -E 'telegram_bot_token[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
-CHAT_ID=$(grep -E 'telegram_chat_id[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
+ENABLE_ALERTS=$(grep -iE 'enable_telegram_alerts[[:space:]]*=[[:space:]]*(true|false)' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*(true|false).*/\1/' | tr '[:upper:]' '[:lower:]' || true)
+BOT_TOKEN=$(grep -E 'telegram_bot_token[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/' || true)
+CHAT_ID=$(grep -E 'telegram_chat_id[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/' || true)
 
 send_telegram_alert() {
     local message="$1"
     if [ "$ENABLE_ALERTS" = "true" ] && [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
-        curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+        local response
+        response=$(curl -sS -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
             -d "chat_id=$CHAT_ID" \
             --data-urlencode "text=$message" \
-            -d "parse_mode=HTML" > /dev/null || true
+            -d "parse_mode=HTML" 2>&1) || true
+        if echo "$response" | grep -q '"ok":false'; then
+            echo "Aviso: Telegram retornou erro -> $response" >&2
+        fi
     fi
 }
 

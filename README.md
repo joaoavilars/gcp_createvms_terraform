@@ -139,6 +139,16 @@ custom-1-12288     → N1, 1 vCPU,  12 GB RAM  ← única família que aceita 1 
 
 > **Atenção:** E2, N2 e N4 exigem no mínimo 2 vCPUs no modo custom. Para 1 vCPU custom, use a família **N1** (sintaxe sem prefixo: `custom-1-<RAM>`).
 
+Listar projetos disponíveis na sua conta GCP:
+```bash
+gcloud projects list
+```
+
+A coluna `PROJECT_ID` é o valor a ser usado em `project_id` no `terraform.tfvars`. Para definir o projeto ativo no CLI:
+```bash
+gcloud config set project SEU_PROJECT_ID
+```
+
 Listar tipos disponíveis na sua zona:
 ```bash
 gcloud compute machine-types list --filter="zone:us-central1-a"

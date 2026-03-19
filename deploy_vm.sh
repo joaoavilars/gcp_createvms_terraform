@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 
 TFVARS_FILE="terraform.tfvars"
 
@@ -8,17 +9,17 @@ if [ ! -f "$TFVARS_FILE" ]; then
 fi
 
 # Extrair variáveis do terraform.tfvars
-ENABLE_ALERTS=$(grep -E '(?i)enable_telegram_alerts[[:space:]]*=[[:space:]]*(true|false)' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*(true|false).*/\1/' | tr '[:upper:]' '[:lower:]')
+ENABLE_ALERTS=$(grep -iE 'enable_telegram_alerts[[:space:]]*=[[:space:]]*(true|false)' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*(true|false).*/\1/' | tr '[:upper:]' '[:lower:]')
 BOT_TOKEN=$(grep -E 'telegram_bot_token[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
 CHAT_ID=$(grep -E 'telegram_chat_id[[:space:]]*=' "$TFVARS_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
 
 send_telegram_alert() {
     local message="$1"
-    if [ "$ENABLE_ALERTS" == "true" ] && [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+    if [ "$ENABLE_ALERTS" = "true" ] && [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
         curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
             -d "chat_id=$CHAT_ID" \
-            -d "text=$message" \
-            -d "parse_mode=HTML" > /dev/null
+            --data-urlencode "text=$message" \
+            -d "parse_mode=HTML" > /dev/null || true
     fi
 }
 

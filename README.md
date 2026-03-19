@@ -1,93 +1,183 @@
-# Provisionamento de Máquinas Virtuais no GCP via Terraform
+# Provisionamento de VMs no GCP via Terraform
 
-Este repositório contém a infraestrutura como código (IaC) em Terraform para provisionar Máquinas Virtuais no Google Cloud Platform rapidamente.
+Infraestrutura como código (IaC) para provisionar Máquinas Virtuais no Google Cloud Platform com IP externo fixo e notificações opcionais via Telegram.
 
-## Recursos Integrados
-- **Rede Padrão e Firewall global**: Atrelada à interface `default` e com as tags `http-server` e `https-server` ativadas.
-- **Disco Fixo e Customizável**: Variável com suporte para discos básicos ou Hyperdisk. Os Discos não recebem políticas de backup.
-- **Service Account Padrão**: Segue atrelado à conta de serviço base do Compute Engine.
-- **Acesso Externo Exclusivo**: Atribuição e reserva de IP Externo Fixo (Estático).
+---
 
-## Guia de Início Rápido
+## Recursos Provisionados
 
-1. **Autenticação:**
-   Certifique-se de que o [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (`gcloud`) esteja instalado. Faça o login de aplicação pelo terminal de dentro da pasta:
-   ```bash
-   gcloud auth application-default login
-   ```
+| Recurso | Descrição |
+|---|---|
+| `google_compute_instance` | VM com disco, SO e chave SSH configuráveis |
+| `google_compute_address` | IP externo fixo (estático) reservado e associado à VM |
+| Firewall | Tags `http-server` e `https-server` aplicadas (regras globais da rede `default`) |
 
-2. **Criação das Variáveis Essenciais:**
-   Duplique o arquivo modelo:
-   - Linux / MacOS: `cp terraform.tfvars.example terraform.tfvars`
-   - Windows: `copy terraform.tfvars.example terraform.tfvars`
-   
-   Após copiar, abra o arquivo `terraform.tfvars` alterando: as keys SSH, o id real de projeto do GCP (`project_id`), o modelo da máquina e casando o `boot_disk_type` correspondente à série do processador.
+**Comportamentos fixos:**
+- Rede: interface `default` do projeto GCP
+- Service Account: conta padrão do Compute Engine
+- Backup: nenhuma política de backup associada ao disco
+- Chaves SSH: alterações ignoradas pelo Terraform após a criação (evita recriação acidental da VM)
 
-3. **Iniciando e Instalando Dependências:**
-   ```bash
-   terraform init
-   ```
+---
 
-4. **Validando Modificações (Dry Run):**
-   Veja os recursos que serão aplicados antes de cobrar ou aprovar qualquer implantação real com o comando:
-   ```bash
-   terraform plan
-   ```
+## Pré-requisitos
 
-5. **Aplicar as Alterações (Deploy):**
-   Para realizar o provisionamento padrão, execute:
-   ```bash
-   terraform apply
-   ```
-   *(Nota: Se você configurou os Alertas do Telegram, veja a seção abaixo sobre como utilizar os scripts wrapper na hora do deploy).*
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) instalado
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (`gcloud`) instalado e autenticado:
+  ```bash
+  gcloud auth application-default login
+  ```
+
+---
+
+## Início Rápido
+
+### 1. Clonar e configurar variáveis
+
+```bash
+# Linux / macOS
+cp terraform.tfvars.example terraform.tfvars
+
+# Windows
+copy terraform.tfvars.example terraform.tfvars
+```
+
+Edite o `terraform.tfvars` preenchendo ao menos:
+
+| Variável | Descrição |
+|---|---|
+| `project_id` | ID real do seu projeto no GCP |
+| `vm_name` | Nome da VM a ser criada |
+| `machine_type` | Tipo de máquina (ver seção abaixo) |
+| `boot_disk_type` | Tipo de disco (deve ser compatível com o `machine_type`) |
+| `ssh_key` | Chave SSH pública no formato `usuario:ssh-rsa AAAA...` |
+
+### 2. Inicializar o Terraform
+
+```bash
+terraform init
+```
+
+### 3. Validar o plano (dry run)
+
+```bash
+terraform plan
+```
+
+### 4. Provisionar
+
+```bash
+# Padrão (interativo)
+terraform apply
+
+# Com notificações via Telegram (recomendado)
+bash deploy_vm.sh          # Linux / macOS / WSL / Git Bash
+.\deploy_vm.ps1            # Windows (PowerShell)
+```
+
+### 5. Destruir a infraestrutura
+
+```bash
+terraform destroy
+```
+
+---
 
 ## Alertas via Telegram (Opcional)
 
-Você pode receber notificações automáticas no seu Telegram sempre que o processo de provisionamento iniciar, for concluído com sucesso ou apresentar falhas técnicas.
+Receba notificações de início, sucesso e falha diretamente no seu Telegram.
 
-**Como configurar e executar:**
-1. No seu arquivo `terraform.tfvars`, adicione as três variáveis e preencha com os dados reais do seu bot:
-   ```hcl
-   enable_telegram_alerts = true
-   telegram_bot_token     = "SEU_TOKEN_AQUI"
-   telegram_chat_id       = "SEU_CHAT_ID_AQUI"
-   ```
-2. Na hora do Deploy, ao invés de rodar `terraform apply` manualmente, utilize os scripts integrados na raiz do projeto. Eles se encarregam de disparar o Terraform e analisar os logs:
-   - Usuários de Windows (PowerShell):
-     ```powershell
-     .\deploy_vm.ps1
-     ```
-   - Usuários de Linux, macOS, WSL ou Git Bash:
-     ```bash
-     bash deploy_vm.sh
-     ```
+**Configuração no `terraform.tfvars`:**
+```hcl
+enable_telegram_alerts = true
+telegram_bot_token     = "SEU_TOKEN_AQUI"   # gerado pelo @BotFather
+telegram_chat_id       = "SEU_CHAT_ID_AQUI"
+```
 
-## Estrutura de Diretório
-- `main.tf`: Definição dos blocos do Google Compute Engine (Instância e IP Fixo).
-- `variables.tf`: Especificação das propriedades exigidas.
-- `terraform.tfvars.example`: Planilha visual de como formatar seus dados.
-- `outputs.tf`: Onde consultamos rapidamente os labels como o Novo IP Fixo injetado.
+> Os scripts `deploy_vm.sh` e `deploy_vm.ps1` leem essas variáveis automaticamente e disparam as notificações.
 
-## Dicas Úteis (CLI e Configurações API)
+---
 
-**1. Listar Modelos de Máquina Disponíveis**
-Para listar os tipos de máquinas suportados na sua zona diretamente no terminal, use:
+## Referência de Variáveis
+
+| Variável | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `project_id` | `string` | — | ID do projeto GCP |
+| `region` | `string` | `us-central1` | Região para a instância e o IP |
+| `zone` | `string` | `us-central1-a` | Zona da instância |
+| `vm_name` | `string` | — | Nome da VM |
+| `machine_type` | `string` | — | Tipo de máquina (predefinido ou custom) |
+| `os_image` | `string` | — | Imagem do SO (ex: `ubuntu-os-cloud/ubuntu-2404-lts-amd64`) |
+| `boot_disk_size` | `number` | `50` | Tamanho do disco em GB |
+| `boot_disk_type` | `string` | `pd-balanced` | Tipo do disco (ver compatibilidade abaixo) |
+| `ssh_key` | `string` | — | Chave SSH pública (`usuario:ssh-rsa AAAA...`) |
+| `enable_telegram_alerts` | `bool` | `false` | Ativa notificações via Telegram |
+| `telegram_bot_token` | `string` | `""` | Token do bot do Telegram |
+| `telegram_chat_id` | `string` | `""` | ID do chat/grupo para notificações |
+
+---
+
+## Guia de Tipos de Máquina
+
+### Tipos Predefinidos
+
+```
+e2-micro        → 2 vCPUs compartilhadas, 1 GB RAM
+e2-standard-4   → 4 vCPUs, 16 GB RAM
+n4-standard-4   → 4 vCPUs, 16 GB RAM
+```
+
+### Tipos Customizados
+
+Formato: `<familia>-custom-<vCPUs>-<RAM_em_MB>`
+
+```
+e2-custom-2-12288  → E2, 2 vCPUs, 12 GB RAM
+n2-custom-4-32768  → N2, 4 vCPUs, 32 GB RAM
+custom-1-12288     → N1, 1 vCPU,  12 GB RAM  ← única família que aceita 1 vCPU
+```
+
+> **Atenção:** E2, N2 e N4 exigem no mínimo 2 vCPUs no modo custom. Para 1 vCPU custom, use a família **N1** (sintaxe sem prefixo: `custom-1-<RAM>`).
+
+Listar tipos disponíveis na sua zona:
 ```bash
 gcloud compute machine-types list --filter="zone:us-central1-a"
 ```
 
-**2. Listar Imagens do Sistema Operacional (Ubuntu)**
-Caso queira garantir o nome exato da imagem LTS mais recente do Ubuntu (ex: 22.04 LTS ou 24.04 LTS), execute:
+---
+
+## Compatibilidade: Disco x Família de Processador
+
+| Tipo de Disco | Famílias Compatíveis | Famílias Incompatíveis |
+|---|---|---|
+| `pd-standard`, `pd-balanced`, `pd-ssd` | E2, N1, N2, N2D, C2, T2D | N4, C3, M3 |
+| `hyperdisk-balanced`, `hyperdisk-extreme` | N4, C3, M3 | E2, N1, N2 |
+
+---
+
+## Imagens de Sistema Operacional
+
+Listar imagens Ubuntu disponíveis:
 ```bash
 gcloud compute images list --project ubuntu-os-cloud --no-standard-images
 ```
 
-**3. Matriz de Compatibilidade de Discos x Processadores**
-- **Discos Padrões** (`pd-balanced`, `pd-ssd`, etc): Compatíveis com as séries E2, N1, N2, N2D, C2, T2D, etc. *Incompatíveis com a nova geração N4, C3, M3*.
-- **Discos Hyperdisk** (`hyperdisk-balanced`, etc): Compatíveis *SOMENTE* com instâncias modernas como N4, C3 e M3. *Incompatíveis com as linhas antigas (E2, N2, N1)*.
+Exemplos:
+```
+ubuntu-os-cloud/ubuntu-2404-lts-amd64   → Ubuntu 24.04 LTS
+ubuntu-os-cloud/ubuntu-2204-lts         → Ubuntu 22.04 LTS
+```
 
-**4. Regra para Instâncias Customizadas**
-O GCP permite configurações sob medida (ex: pouca CPU e muita memória).
-A nomenclatura exige Megabytes na RAM. Exemplos: `e2-custom-2-12288` ou `n2-custom-4-32768`.
-- Lembre-se que a família **N1** é a *única* que suporta instâncias customizadas com apenas **1 vCPU** (ex: `custom-1-12288`).
-- Famílias mais modernas como **E2** e **N2** exigem no mínimo *2 vCPUs* em qualquer configuração custom.
+---
+
+## Estrutura do Projeto
+
+```
+.
+├── main.tf                    # Recursos: VM e IP fixo
+├── variables.tf               # Declaração das variáveis
+├── outputs.tf                 # Outputs: nome, IP e zona
+├── terraform.tfvars.example   # Modelo de configuração
+├── deploy_vm.sh               # Script de deploy (Linux/macOS)
+└── deploy_vm.ps1              # Script de deploy (Windows)
+```

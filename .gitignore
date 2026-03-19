@@ -1,0 +1,72 @@
+# =============================================================================
+# Terraform
+# =============================================================================
+
+# Diretório de plugins e módulos baixados pelo terraform init
+.terraform/
+
+# Arquivos de estado (podem conter dados sensíveis)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Planos de execução gerados pelo terraform plan
+*.tfplan
+*.tfplan.*
+
+# Log de crashes
+crash.log
+crash.*.log
+
+# Arquivos de override (uso local)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Arquivo de configuração local do CLI
+.terraformrc
+terraform.rc
+
+# =============================================================================
+# Variáveis e Segredos (NUNCA commitar)
+# =============================================================================
+
+# Arquivo de variáveis real (contém tokens, chaves SSH e IDs sensíveis)
+terraform.tfvars
+
+# Qualquer arquivo .env
+.env
+.env.*
+
+# =============================================================================
+# Sistema Operacional
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# =============================================================================
+# Editores e IDEs
+# =============================================================================
+
+# VSCode
+.vscode/
+
+# JetBrains (IntelliJ, GoLand, etc.)
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo

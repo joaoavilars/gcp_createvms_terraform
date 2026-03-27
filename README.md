@@ -61,12 +61,44 @@ Você pode receber notificações automáticas no seu Telegram sempre que o proc
      ```bash
      bash deploy_vm.sh
      ```
+   > **Nota Técnica**: *Os scripts em Bash vêm aprimorados com limpezas rigorosas de CRLF (`\r`) nativo do Windows e filtros Case-Insensitive universais, evitando falhas silenciosas na extração das chaves, independente da plataforma que você ou sua equipe utilizarem.*
 
 ## Estrutura de Diretório
 - `main.tf`: Definição dos blocos do Google Compute Engine (Instância e IP Fixo).
 - `variables.tf`: Especificação das propriedades exigidas.
 - `terraform.tfvars.example`: Planilha visual de como formatar seus dados.
 - `outputs.tf`: Onde consultamos rapidamente os labels como o Novo IP Fixo injetado.
+- `undeploy_vm/`: Pasta isolada para exclusão flexível e segura de VMs via CLI (gcloud), sem conflitos com o Terraform State.
+
+---
+
+## Destruição de Recursos (Undeploy isolado)
+
+Caso você queira apagar uma VM específica (junto com o IP e eventuais discos remanescentes) sem depender do ciclo restrito do `terraform destroy`, você pode usar a estrutura contida na pasta `undeploy_vm/`:
+
+1. **Configure as Variáveis:** 
+   Modifique o arquivo `undeploy.conf` na raiz deste subdiretório, apontando o **projeto**, **nome exato** da VM e **Zona**.
+2. **Rode o Bash Script:**
+   ```bash
+   cd undeploy_vm
+   ./undeploy_vm.sh
+   ```
+
+Este script fará uma exclusão inteligente localizando dinamicamente primeiro qualquer disco que estava associado à CLI da nuvem, disparando a deleção completa de forma cirúrgica e limpa, e notificando a conclusão no Telegram.
+
+### Flags de Contexto no Undeploy
+Você pode injetar comandos na hora de rodar o script no terminal para poupar recursos:
+
+- `--preserve-disk`: Deleta a VM mas aciona as apis do cloud para ignorar a conservação do disco. Pula a varredura manual de discos que sobram.
+- `--preserve-ip`: Deleta a VM e Discos normalmente mas resguarda a exclusão do endereço IP Fixo (caso queira apontar para outra VM no futuro).
+- `--help`: Exibe um painel completo de uso do bash script.
+
+*Exemplo combinando flags e mantendo os dados daquela máquina vivos:*
+```bash
+./undeploy_vm.sh --preserve-disk --preserve-ip
+```
+
+---
 
 ## Dicas Úteis (CLI e Configurações API)
 

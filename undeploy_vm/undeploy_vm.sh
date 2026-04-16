@@ -20,7 +20,7 @@ show_help() {
     echo "  O script lê os dados obrigatórios do arquivo 'undeploy.conf' na mesma pasta."
     echo "  Neste arquivo você deve definir:"
     echo "    project_id             -> ID do Projeto no GCP"
-    echo "    vm_name                -> Nome exato da VM a ser deletada"
+    echo "    source_instance_name   -> Nome exato da VM a ser deletada"
     echo "    region / zone          -> Localização da VM e do IP"
     echo "    enable_telegram_alerts -> true ou false"
     echo "    telegram_bot_token / telegram_chat_id -> Para alertas de processo"
@@ -53,7 +53,7 @@ fi
 
 # Extrair variáveis do undeploy.conf (usando grep -i e tr -d \r para compatibilidade no Windows)
 PROJECT_ID=$(grep -Ei '^project_id[[:space:]]*=[[:space:]]*' "$CONF_FILE" | tr -d '\r' | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
-VM_NAME=$(grep -Ei '^vm_name[[:space:]]*=[[:space:]]*' "$CONF_FILE" | tr -d '\r' | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
+VM_NAME=$(grep -Ei '^source_instance_name[[:space:]]*=[[:space:]]*' "$CONF_FILE" | tr -d '\r' | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
 ZONE=$(grep -Ei '^zone[[:space:]]*=[[:space:]]*' "$CONF_FILE" | tr -d '\r' | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
 REGION=$(grep -Ei '^region[[:space:]]*=[[:space:]]*' "$CONF_FILE" | tr -d '\r' | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
 
@@ -63,7 +63,7 @@ CHAT_ID=$(grep -E '^telegram_chat_id[[:space:]]*=' "$CONF_FILE" | tr -d '\r' | s
 
 # Validação básica
 if [ -z "$VM_NAME" ] || [ -z "$PROJECT_ID" ]; then
-    echo "Erro: vm_name e project_id devem estar preenchidos no $CONF_FILE."
+    echo "Erro: source_instance_name e project_id devem estar preenchidos no $CONF_FILE."
     exit 1
 fi
 

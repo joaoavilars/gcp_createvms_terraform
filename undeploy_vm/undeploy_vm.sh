@@ -67,13 +67,23 @@ if [ -z "$VM_NAME" ] || [ -z "$PROJECT_ID" ]; then
     exit 1
 fi
 
+# Cores
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 send_telegram_alert() {
     local message="$1"
     if [ "$ENABLE_ALERTS" == "true" ] && [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
-        curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
             -d "chat_id=$CHAT_ID" \
             -d "text=$message" \
-            -d "parse_mode=HTML" > /dev/null
+            -d "parse_mode=HTML")
+        if [ "$HTTP_CODE" != "200" ]; then
+            echo -e "${YELLOW}Falha ao enviar alerta para o Telegram.${NC}"
+        fi
     fi
 }
 
@@ -86,7 +96,7 @@ elif [ "$PRESERVE_IP" = true ]; then
     PRESERVED_INFO=" (IP preservado)"
 fi
 
-echo "Iniciando processo de Undeploy..."
+echo -e "${CYAN}Iniciando processo de Undeploy...${NC}"
 echo "Projeto: $PROJECT_ID"
 echo "VM a ser removida: $VM_NAME"
 
@@ -107,8 +117,8 @@ fi
 
 echo "Deletando instância da VM..."
 if gcloud compute instances delete "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" $KEEP_DISKS_FLAG --quiet; then
-    echo "Sucesso: Instância $VM_NAME deletada."
-    
+    echo -e "${GREEN}Sucesso: Instância $VM_NAME deletada.${NC}"
+
     # Após deletar a VM, excluímos os discos atrelados caso a preservação NÃO esteja ativa
     if [ "$PRESERVE_DISK" = false ] && [ -n "$DISKS_TO_DELETE" ]; then
         # O for separa as URLs que vieram com espaço
@@ -119,7 +129,8 @@ if gcloud compute instances delete "$VM_NAME" --project="$PROJECT_ID" --zone="$Z
         done
     fi
 else
-    echo "Aviso: Falha ao deletar a instância $VM_NAME (ou ela já não existia)."
+    echo -e "${RED}Aviso: Falha ao deletar a instância $VM_NAME (ou ela já não existia).${NC}"
+    send_telegram_alert "⚠️ <b>GCP:</b> Falha ao deletar a instância <b>$VM_NAME</b> (ou ela já não existia)."
 fi
 
 # 2. Remover IP Fixo (Sempre segue o padrão vm_name-static-ip nas vars do terraform)
@@ -131,12 +142,13 @@ else
     echo "------------------------------------------------------"
     echo "Deletando IP Fixo: $STATIC_IP_NAME..."
     if gcloud compute addresses delete "$STATIC_IP_NAME" --project="$PROJECT_ID" --region="$REGION" --quiet; then
-        echo "Sucesso: IP Fixo $STATIC_IP_NAME deletado."
+        echo -e "${GREEN}Sucesso: IP Fixo $STATIC_IP_NAME deletado.${NC}"
     else
-        echo "Aviso: Falha ao deletar o IP fixo $STATIC_IP_NAME (ou ele já não existia)."
+        echo -e "${RED}Aviso: Falha ao deletar o IP fixo $STATIC_IP_NAME (ou ele já não existia).${NC}"
+        send_telegram_alert "⚠️ <b>GCP:</b> Falha ao deletar o IP fixo <b>$STATIC_IP_NAME</b> (ou ele já não existia)."
     fi
 fi
 
 echo "------------------------------------------------------"
-echo "Undeploy concluído!"
+echo -e "${GREEN}Undeploy concluído!${NC}"
 send_telegram_alert "✅ <b>GCP:</b> Undeploy da VM <b>$VM_NAME</b> finalizado!${PRESERVED_INFO}"

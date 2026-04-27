@@ -4,7 +4,7 @@ Este repositório contém a infraestrutura como código (IaC) em Terraform para 
 
 ## Recursos Integrados
 - **Rede Padrão e Firewall global**: Atrelada à interface `default` e com as tags `http-server` e `https-server` ativadas.
-- **Disco Fixo e Customizável**: Variável com suporte para discos básicos ou Hyperdisk. Os Discos não recebem políticas de backup.
+- **Discos Fixos e Customizáveis**: Variável com suporte para discos de inicialização básicos ou Hyperdisk. Possui também a opção de provisionar e anexar automaticamente um **disco extra** para dados. Os Discos não recebem políticas de backup.
 - **Service Account Padrão**: Segue atrelado à conta de serviço base do Compute Engine.
 - **Acesso Externo Exclusivo**: Atribuição e reserva de IP Externo Fixo (Estático).
 

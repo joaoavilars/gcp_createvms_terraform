@@ -10,10 +10,20 @@ resource "google_compute_address" "static_ip" {
   region = var.region
 }
 
+locals {
+  # Instancias padrao geralmente possuem 4GB de RAM por vCPU
+  is_standard = var.machine_ram == (var.machine_cpus * 4)
+
+  # A familia n1 usa apenas o prefixo "custom", enquanto as outras usam "familia-custom"
+  custom_prefix = var.machine_model_base == "n1" ? "custom" : "${var.machine_model_base}-custom"
+
+  machine_type = local.is_standard ? "${var.machine_model_base}-standard-${var.machine_cpus}" : "${local.custom_prefix}-${var.machine_cpus}-${var.machine_ram * 1024}"
+}
+
 # Criação da VM
 resource "google_compute_instance" "vm_instance" {
   name         = var.vm_name
-  machine_type = var.machine_type
+  machine_type = local.machine_type
   zone         = var.zone
 
   # Dispositivo de exibição ativado
@@ -50,4 +60,20 @@ resource "google_compute_instance" "vm_instance" {
       metadata["ssh-keys"]
     ]
   }
+}
+
+# Criação do Disco Extra (Condicional)
+resource "google_compute_disk" "extra_disk" {
+  count = var.create_extra_disk ? 1 : 0
+  name  = "${var.vm_name}-extra-disk"
+  type  = var.extra_disk_type
+  size  = var.extra_disk_size
+  zone  = var.zone
+}
+
+# Anexar o Disco Extra na VM (Condicional)
+resource "google_compute_attached_disk" "attach_extra_disk" {
+  count    = var.create_extra_disk ? 1 : 0
+  disk     = google_compute_disk.extra_disk[0].id
+  instance = google_compute_instance.vm_instance.id
 }

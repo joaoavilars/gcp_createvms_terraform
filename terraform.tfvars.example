@@ -37,8 +37,14 @@ vm_name        = "minha-vm-producao"
 #      A sintaxe da N1 *não leva* prefixo, ficando assim: "custom-1-12288"
 #      As famílias mais novas (E2, N2, N4) exigem no mínimo 2 vCPUs no modo custom.
 #
+#    Atenção à família T2D (Tau):
+#    - A família T2D NÃO suporta modelos customizados. Você deve sempre usar os
+#      modelos padrões (ex: t2d-standard-2 com 8GB, t2d-standard-4 com 16GB).
+#
 # ================================================================================
-machine_type   = "e2-standard-4"
+machine_model_base = "e2"
+machine_cpus       = 4
+machine_ram        = 16
 
 # Sistema Operacional (Ubuntu LTS)
 # Para garantir sempre a versão LTS do Ubuntu (ex: 20.04, 22.04, 24.04).
@@ -74,3 +80,12 @@ ssh_key        = "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... admin@dominio
 enable_telegram_alerts = false
 telegram_bot_token     = "SEU_TOKEN_AQUI"
 telegram_chat_id       = "SEU_CHAT_ID_AQUI"
+
+# ================================================================================
+# DISCO EXTRA
+# ================================================================================
+# Se precisar de um disco de dados adicional (além do disco de boot),
+# habilite a opção abaixo e configure o tamanho e o tipo.
+create_extra_disk = false
+extra_disk_size   = 50
+extra_disk_type   = "pd-balanced"

@@ -49,5 +49,14 @@ resource "google_compute_instance" "vm_instance" {
     ignore_changes = [
       metadata["ssh-keys"]
     ]
+
+    # Trava de segurança: garante que o workspace ativo é o mesmo declarado em
+    # workspace_name no terraform.tfvars. Cada VM tem seu próprio workspace/state;
+    # isso impede que um apply feito no workspace errado leia ou substitua o
+    # state de outra VM/projeto.
+    precondition {
+      condition     = terraform.workspace == var.workspace_name
+      error_message = "Workspace ativo ('${terraform.workspace}') difere de 'workspace_name' no terraform.tfvars ('${var.workspace_name}'). Rode 'terraform workspace select ${var.workspace_name}' (o deploy_vm.sh faz isso automaticamente) antes de aplicar."
+    }
   }
 }

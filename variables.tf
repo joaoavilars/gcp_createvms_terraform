@@ -64,3 +64,8 @@ variable "telegram_chat_id" {
   type        = string
   default     = ""
 }
+
+variable "workspace_name" {
+  description = "Nome do Terraform Workspace usado para isolar o state desta VM/projeto. Cada VM deve ter um workspace próprio e ÚNICO (ex: '<project_id>-<vm_name>'), garantindo que o apply de uma VM nunca leia ou altere o state de outra. Use 'default' apenas para a VM clássica que já existia antes desta trava."
+  type        = string
+}

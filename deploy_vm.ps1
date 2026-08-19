@@ -3,25 +3,36 @@
 Script para provisionar VMs no GCP via Terraform e notificar via Telegram.
 
 .DESCRIPTION
-Lê as variáveis do Telegram do arquivo terraform.tfvars, 
-notifica o início do processo, executa o terraform apply
-e notifica o sucesso ou erro.
+Le as variaveis (incluindo workspace_name) do arquivo terraform.tfvars,
+seleciona/cria o Terraform Workspace correspondente (isolando o state
+desta VM do state de qualquer outra), gera um plano e SO aplica se o
+plano for 100% criacao de recursos novos. Alteracoes/exclusoes exigem
+a flag -AllowDestructive e uma confirmacao explicita digitada.
+
+.PARAMETER AllowDestructive
+Permite prosseguir mesmo se o plano contiver updates/deletes, mediante
+confirmacao explicita digitada no terminal.
 #>
 
-$RED = "`e[31m"
-$GREEN = "`e[32m"
-$YELLOW = "`e[33m"
-$CYAN = "`e[36m"
-$NC = "`e[0m"
+param(
+    [switch]$AllowDestructive
+)
 
 $tfvarsPath = "terraform.tfvars"
 
 if (!(Test-Path $tfvarsPath)) {
-    Write-Host "Arquivo $tfvarsPath não encontrado!" -ForegroundColor Red
+    Write-Host "Arquivo $tfvarsPath nao encontrado!" -ForegroundColor Red
     exit 1
 }
 
-# Extrair as variáveis do Telegram
+foreach ($cmd in @("terraform")) {
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+        Write-Host "Erro: comando '$cmd' nao encontrado no PATH." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Extrair as variaveis do Telegram e do Workspace
 $enableAlerts = $false
 try {
     $enableMatch = (Select-String -Path $tfvarsPath -Pattern '(?i)enable_telegram_alerts\s*=\s*(true|false)').Matches.Groups[1].Value
@@ -36,6 +47,17 @@ try {
     $botToken = (Select-String -Path $tfvarsPath -Pattern 'telegram_bot_token\s*=\s*"([^"]+)"').Matches.Groups[1].Value
     $chatId = (Select-String -Path $tfvarsPath -Pattern 'telegram_chat_id\s*=\s*"([^"]+)"').Matches.Groups[1].Value
 } catch {}
+
+$workspaceName = ""
+try {
+    $workspaceName = (Select-String -Path $tfvarsPath -Pattern '(?im)^\s*workspace_name\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+} catch {}
+
+if ([string]::IsNullOrWhiteSpace($workspaceName)) {
+    Write-Host "Erro: 'workspace_name' nao definido em $tfvarsPath." -ForegroundColor Red
+    Write-Host "Defina um nome unico de workspace para esta VM (ou 'default' para a VM classica ja existente)." -ForegroundColor Red
+    exit 1
+}
 
 function Send-TelegramAlert {
     param([string]$Message)
@@ -55,106 +77,74 @@ function Send-TelegramAlert {
     }
 }
 
-Write-Host "Iniciando provisionamento..." -ForegroundColor Cyan
-Send-TelegramAlert -Message "🚀 <b>GCP:</b> Início do processo de provisionamento da VM pelo Terraform..."
-
-# ========================================
-# VALIDAÇÕES DE SEGURANÇA
-# ========================================
-
-# Extrai dados do tfvars
-$projectId = (Select-String -Path $tfvarsPath -Pattern 'project_id\s*=\s*"([^"]+)"').Matches.Groups[1].Value
-$vmName = (Select-String -Path $tfvarsPath -Pattern 'vm_name\s*=\s*"([^"]+)"').Matches.Groups[1].Value
-
-# Verifica se existe state anterior
-if (Test-Path "terraform.tfstate") {
-    $stateContent = Get-Content "terraform.tfstate" -Raw | ConvertFrom-Json
-    
-    # Extrai projeto e VM do state
-    $stateProject = $null
-    $stateVM = $null
-    
-    foreach ($resource in $stateContent.resources) {
-        if ($resource.type -eq "google_compute_instance") {
-            $stateProject = $resource.instances[0].attributes.project
-            $stateVM = $resource.instances[0].attributes.name
-            break
-        }
-    }
-    
-    # Se state tem VM diferente, remove automaticamente (o script só cria VMs novas)
-    if ($stateProject -and $stateVM) {
-        if ($stateProject -ne $projectId -or $stateVM -ne $vmName) {
-            Write-Host "`n${YELLOW}================================================================${NC}"
-            Write-Host "${YELLOW}  VM ANTERIOR DETECTADA NO STATE - REMOVENDO AUTOMATICAMENTE${NC}"
-            Write-Host "${YELLOW}================================================================${NC}"
-            Write-Host "`n${CYAN}State atual gerenciava:${NC}"
-            Write-Host "  Projeto: ${CYAN}$stateProject${NC}"
-            Write-Host "  VM:      ${CYAN}$stateVM${NC}"
-            Write-Host "`n${CYAN}Nova VM solicitada:${NC}"
-            Write-Host "  Projeto: ${CYAN}$projectId${NC}"
-            Write-Host "  VM:      ${CYAN}$vmName${NC}"
-            Write-Host "`n${GREEN}A VM '$stateVM' NÃO será destruída no GCP.${NC} Ela apenas deixará de ser gerenciada pelo Terraform, liberando o state para criar a VM nova."
-
-            $backupName = "terraform.tfstate.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-            Copy-Item "terraform.tfstate" $backupName
-            Write-Host "${CYAN}Backup do state salvo em: $backupName${NC}"
-
-            Write-Host "`n${CYAN}Removendo recursos antigos do state...${NC}"
-            $oldResources = terraform state list
-            foreach ($resource in $oldResources) {
-                Write-Host "Removendo: $resource"
-                terraform state rm $resource
-            }
-            Write-Host "${GREEN}State limpo. Prosseguindo para criar a VM nova.${NC}`n"
-        }
-    }
-}
-
-Write-Host "`n================================================" -ForegroundColor Yellow
-Write-Host "VERIFICAÇÃO DE SEGURANÇA - TERRAFORM PLAN" -ForegroundColor Yellow
-Write-Host "================================================" -ForegroundColor Yellow
-Write-Host "Projeto destino: $projectId" -ForegroundColor Cyan
-Write-Host "VM destino: $vmName" -ForegroundColor Cyan
-Write-Host "`nExecutando terraform plan para verificar mudanças...`n" -ForegroundColor Cyan
-
-# Executa plan primeiro
-terraform plan -out=tfplan
-
+Write-Host "Selecionando workspace do Terraform: $workspaceName" -ForegroundColor Cyan
+& terraform workspace select $workspaceName 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "`n[ERRO] Terraform plan falhou!" -ForegroundColor Red
-    exit 1
+    Write-Host "Workspace '$workspaceName' nao existe ainda. Criando (state isolado, nao afeta outras VMs)..." -ForegroundColor Yellow
+    & terraform workspace new $workspaceName
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Erro ao criar o workspace '$workspaceName'." -ForegroundColor Red
+        exit 1
+    }
 }
 
-Write-Host "`n================================================" -ForegroundColor Yellow
-Write-Host "CONFIRMAÇÃO MANUAL OBRIGATÓRIA" -ForegroundColor Yellow
-Write-Host "================================================" -ForegroundColor Yellow
-Write-Host "ATENÇÃO: Revise o plano acima cuidadosamente!" -ForegroundColor Red
-Write-Host "Verifique se há recursos marcados para DESTRUIÇÃO (-)" -ForegroundColor Red
-Write-Host "`nProjeto: $projectId" -ForegroundColor Cyan
-Write-Host "VM: $vmName`n" -ForegroundColor Cyan
+Write-Host "Iniciando provisionamento..." -ForegroundColor Cyan
+Send-TelegramAlert -Message "🚀 <b>GCP:</b> Inicio do processo de provisionamento (workspace: <b>$workspaceName</b>)..."
 
-$confirmation = Read-Host "Digite 'SIM' (maiúsculo) para prosseguir com apply"
+$planFile = New-TemporaryFile
+$planJsonFile = New-TemporaryFile
 
-if ($confirmation -ne "SIM") {
-    Write-Host "`n[CANCELADO] Deploy cancelado pelo usuário." -ForegroundColor Yellow
-    Remove-Item tfplan -ErrorAction SilentlyContinue
-    exit 0
-}
+try {
+    Write-Host "Calculando plano (terraform plan)..." -ForegroundColor Cyan
+    & terraform plan -input=false -out=$planFile.FullName
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Erro ao gerar o plano do Terraform." -ForegroundColor Red
+        Send-TelegramAlert -Message "❌ <b>GCP:</b> Erro ao gerar o plano do Terraform (workspace: $workspaceName)."
+        exit 1
+    }
 
-# Executa o Terraform apply com o plan gerado
-Write-Host "`nExecutando terraform apply..." -ForegroundColor Cyan
-terraform apply tfplan
+    & terraform show -json $planFile.FullName | Out-File -Encoding utf8 $planJsonFile.FullName
+    $planData = Get-Content $planJsonFile.FullName -Raw | ConvertFrom-Json
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "`n[SUCESSO] Terraform finalizado com sucesso." -ForegroundColor Green
-    Send-TelegramAlert -Message "✅ <b>GCP:</b> Sucesso! VM '$vmName' no projeto '$projectId' criada/atualizada."
-    
-    # Remove o arquivo de plan
-    Remove-Item tfplan -ErrorAction SilentlyContinue
-} else {
-    Write-Host "`n[ERRO] Ocorreram erros durante o Terraform." -ForegroundColor Red
-    Send-TelegramAlert -Message "❌ <b>GCP:</b> Erro! Falha no provisionamento da VM '$vmName'."
-    Remove-Item tfplan -ErrorAction SilentlyContinue
-    exit $LASTEXITCODE
+    $destructive = @()
+    foreach ($rc in $planData.resource_changes) {
+        if ($rc.change.actions -contains "update" -or $rc.change.actions -contains "delete") {
+            $destructive += "  - $($rc.address) ($($rc.change.actions -join ','))"
+        }
+    }
+
+    if ($destructive.Count -gt 0) {
+        Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+        Write-Host "TRAVA DE SEGURANCA: o plano contem alteracao(oes) ou exclusao(oes):" -ForegroundColor Yellow
+        $destructive | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+        Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+
+        if (-not $AllowDestructive) {
+            Write-Host "Este script e apenas para CRIACAO. Apply cancelado." -ForegroundColor Red
+            Write-Host "Se for intencional, rode novamente com -AllowDestructive." -ForegroundColor Red
+            Send-TelegramAlert -Message "🛑 <b>GCP:</b> Apply BLOQUEADO (workspace: $workspaceName) -- plano tentava alterar/excluir recursos."
+            exit 1
+        }
+
+        $confirmation = Read-Host "Digite CONFIRMAR para prosseguir com estas alteracoes/exclusoes"
+        if ($confirmation -ne "CONFIRMAR") {
+            Write-Host "Confirmacao nao recebida. Apply cancelado." -ForegroundColor Red
+            Send-TelegramAlert -Message "🛑 <b>GCP:</b> Apply cancelado pelo usuario na confirmacao (workspace: $workspaceName)."
+            exit 1
+        }
+        Send-TelegramAlert -Message "⚠️ <b>GCP:</b> Apply com alteracoes/exclusoes CONFIRMADO manualmente (workspace: $workspaceName)."
+    }
+
+    Write-Host "Executando terraform apply..." -ForegroundColor Cyan
+    & terraform apply -input=false $planFile.FullName
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Terraform finalizado com sucesso." -ForegroundColor Green
+        Send-TelegramAlert -Message "✅ <b>GCP:</b> Sucesso! Criacao/atualizacao concluida (workspace: $workspaceName)."
+    } else {
+        Write-Host "Ocorreram erros durante o Terraform." -ForegroundColor Red
+        Send-TelegramAlert -Message "❌ <b>GCP:</b> Erro! Ocorreram erros durante o apply (workspace: $workspaceName)."
+        exit $LASTEXITCODE
+    }
+} finally {
+    Remove-Item -Force $planFile.FullName, $planJsonFile.FullName -ErrorAction SilentlyContinue
 }

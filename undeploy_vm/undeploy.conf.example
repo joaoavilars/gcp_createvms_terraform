@@ -1,0 +1,21 @@
+# undeploy.conf.example
+# Renomeie este arquivo para 'undeploy.conf' e preencha com seus dados.
+
+# -------------------------
+# Configurações do GCP
+# -------------------------
+project_id = "nacionalgas"          # ex: minha-empresa-prod
+region     = "southamerica-east1"   # ex: southamerica-east1 (São Paulo)
+zone       = "southamerica-east1-a" # ex: southamerica-east1-b
+
+source_instance_name = "nacionalgas-prd-br"
+
+# -------------------------
+# Alertas via Telegram
+# -------------------------
+# Habilite ou desabilite os alertas definindo como true ou false (sem aspas)
+enable_telegram_alerts = false
+
+# Se os alertas estiverem habilitados (true), preencha as variáveis abaixo (com aspas):
+telegram_bot_token = "seu-bot-token"
+telegram_chat_id   = "seu-chat-id"

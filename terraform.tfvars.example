@@ -8,6 +8,13 @@ zone           = "us-central1-a"
 # Nome da VM
 vm_name        = "minha-vm-producao"
 
+# Nome do Workspace do Terraform (ISOLA o state desta VM das demais)
+# Cada VM/projeto precisa de um valor ÚNICO aqui (ex: "<project_id>-<vm_name>").
+# Isso garante que rodar o deploy para uma VM nova NUNCA leia, altere ou apague
+# o state (e portanto a VM real) de um deploy anterior com outro workspace_name.
+# Use "default" apenas se estiver reaproveitando o workspace clássico já existente.
+workspace_name = "meu-projeto-gcp-123-minha-vm-producao"
+
 # ================================================================================
 # TIPO DE MÁQUINA (Predefinição, CPUs e RAM)
 # 

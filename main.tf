@@ -8,28 +8,12 @@ provider "google" {
 resource "google_compute_address" "static_ip" {
   name   = "${var.vm_name}-static-ip"
   region = var.region
-  
-  # PROTEÇÃO CRÍTICA: Impede destruição acidental do IP estático
-  lifecycle {
-    prevent_destroy = true
-    create_before_destroy = true
-  }
-}
-
-locals {
-  # Instancias padrao geralmente possuem 4GB de RAM por vCPU
-  is_standard = var.machine_ram == (var.machine_cpus * 4)
-
-  # A familia n1 usa apenas o prefixo "custom", enquanto as outras usam "familia-custom"
-  custom_prefix = var.machine_model_base == "n1" ? "custom" : "${var.machine_model_base}-custom"
-
-  machine_type = local.is_standard ? "${var.machine_model_base}-standard-${var.machine_cpus}" : "${local.custom_prefix}-${var.machine_cpus}-${var.machine_ram * 1024}"
 }
 
 # Criação da VM
 resource "google_compute_instance" "vm_instance" {
   name         = var.vm_name
-  machine_type = local.machine_type
+  machine_type = var.machine_type
   zone         = var.zone
 
   # Dispositivo de exibição ativado
@@ -61,29 +45,18 @@ resource "google_compute_instance" "vm_instance" {
   # Conta de serviço segue a padrão (Compute Engine default service account), então o bloco 'service_account' é omitido
 
   # Ignorar alterações de chaves SSH para não recriar a máquina via pipeline inadvertidamente
-  # PROTEÇÃO CRÍTICA: Impede destruição acidental da VM
   lifecycle {
     ignore_changes = [
       metadata["ssh-keys"]
     ]
-    prevent_destroy = true
-    # Se precisar substituir, cria a nova ANTES de deletar a antiga
-    create_before_destroy = true
+
+    # Trava de segurança: garante que o workspace ativo é o mesmo declarado em
+    # workspace_name no terraform.tfvars. Cada VM tem seu próprio workspace/state;
+    # isso impede que um apply feito no workspace errado leia ou substitua o
+    # state de outra VM/projeto.
+    precondition {
+      condition     = terraform.workspace == var.workspace_name
+      error_message = "Workspace ativo ('${terraform.workspace}') difere de 'workspace_name' no terraform.tfvars ('${var.workspace_name}'). Rode 'terraform workspace select ${var.workspace_name}' (o deploy_vm.sh faz isso automaticamente) antes de aplicar."
+    }
   }
-}
-
-# Criação do Disco Extra (Condicional)
-resource "google_compute_disk" "extra_disk" {
-  count = var.create_extra_disk ? 1 : 0
-  name  = "${var.vm_name}-extra-disk"
-  type  = var.extra_disk_type
-  size  = var.extra_disk_size
-  zone  = var.zone
-}
-
-# Anexar o Disco Extra na VM (Condicional)
-resource "google_compute_attached_disk" "attach_extra_disk" {
-  count    = var.create_extra_disk ? 1 : 0
-  disk     = google_compute_disk.extra_disk[0].id
-  instance = google_compute_instance.vm_instance.id
 }

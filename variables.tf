@@ -20,19 +20,9 @@ variable "vm_name" {
   type        = string
 }
 
-variable "machine_model_base" {
-  description = "Familia da maquina (ex: t2d, n2, e2)"
+variable "machine_type" {
+  description = "Tipo de maquina, predefinição, CPUs, RAM (ex: e2-standard-4, n4-standard-4, ou custo: e2-custom-2-4096)"
   type        = string
-}
-
-variable "machine_cpus" {
-  description = "Quantidade de CPUs da maquina"
-  type        = number
-}
-
-variable "machine_ram" {
-  description = "Quantidade de memoria RAM em GB"
-  type        = number
 }
 
 variable "os_image" {
@@ -75,20 +65,7 @@ variable "telegram_chat_id" {
   default     = ""
 }
 
-variable "create_extra_disk" {
-  description = "Define se um disco extra deve ser criado e anexado à VM"
-  type        = bool
-  default     = false
-}
-
-variable "extra_disk_size" {
-  description = "Tamanho do disco extra em GB"
-  type        = number
-  default     = 50
-}
-
-variable "extra_disk_type" {
-  description = "Tipo do disco extra (pd-balanced, etc)"
+variable "workspace_name" {
+  description = "Nome do Terraform Workspace usado para isolar o state desta VM/projeto. Cada VM deve ter um workspace próprio e ÚNICO (ex: '<project_id>-<vm_name>'), garantindo que o apply de uma VM nunca leia ou altere o state de outra. Use 'default' apenas para a VM clássica que já existia antes desta trava."
   type        = string
-  default     = "pd-balanced"
 }

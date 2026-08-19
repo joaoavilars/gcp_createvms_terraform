@@ -21,7 +21,7 @@ Este repositório contém a infraestrutura como código (IaC) em Terraform para 
    - Linux / MacOS: `cp terraform.tfvars.example terraform.tfvars`
    - Windows: `copy terraform.tfvars.example terraform.tfvars`
    
-   Após copiar, abra o arquivo `terraform.tfvars` alterando: as keys SSH, o id real de projeto do GCP (`project_id`), o modelo da máquina e casando o `boot_disk_type` correspondente à série do processador.
+   Após copiar, abra o arquivo `terraform.tfvars` alterando: as keys SSH, o id real de projeto do GCP (`project_id`), o modelo da máquina, o `boot_disk_type` correspondente à série do processador e o **`workspace_name`** (veja a seção "Múltiplas VMs / Múltiplos Projetos" abaixo — é essencial para não arriscar a VM que já está em produção).
 
 3. **Iniciando e Instalando Dependências:**
    ```bash
@@ -40,6 +40,45 @@ Este repositório contém a infraestrutura como código (IaC) em Terraform para 
    terraform apply
    ```
    *(Nota: Se você configurou os Alertas do Telegram, veja a seção abaixo sobre como utilizar os scripts wrapper na hora do deploy).*
+
+## Múltiplas VMs / Múltiplos Projetos (Isolamento de State)
+
+Este projeto foi originalmente desenhado para gerenciar **uma VM por vez** em um único arquivo de state (`terraform.tfstate`). Se você simplesmente editar `vm_name` ou `project_id` no `terraform.tfvars` para apontar para uma VM nova e rodar `apply`, o Terraform entende que a VM *já existente* mudou de nome/projeto — e como isso força a recriação do recurso, ele planeja **destruir a VM antiga e criar a nova no lugar dela**. Isso é comportamento normal do Terraform, não um bug, mas é exatamente o que você não quer ao simplesmente querer adicionar uma VM nova.
+
+Para resolver isso, o projeto usa **[Terraform Workspaces](https://developer.hashicorp.com/terraform/language/state/workspaces)**: cada VM/projeto tem seu próprio `workspace_name`, e cada workspace guarda um arquivo de state **fisicamente separado** (`.terraform.tfstate.d/<workspace_name>/terraform.tfstate`). Um `apply` rodado em um workspace nunca lê nem altera o state de outro.
+
+### Como funciona na prática
+
+1. **VM já existente (a que já estava em produção):** seu `terraform.tfvars` já vem com `workspace_name = "default"` — é o workspace clássico onde o state dela já mora. Não precisa migrar nada.
+2. **Nova VM / novo projeto:** escolha um `workspace_name` **novo e único** para ela (sugestão: `"<project_id>-<vm_name>"`) e ajuste as demais variáveis (`project_id`, `vm_name`, `machine_type` etc.) normalmente.
+3. Rode `bash deploy_vm.sh` (ou `deploy_vm.ps1` no Windows). O script:
+   - Seleciona automaticamente o workspace de `workspace_name` (criando-o se ainda não existir);
+   - Roda `terraform plan` e inspeciona o resultado;
+   - **Bloqueia o apply** se o plano contiver qualquer `update` ou `delete` — este fluxo é só para criação;
+   - Só aplica se o plano for 100% criação de recursos novos.
+
+### Trava de segurança (create-only por padrão)
+
+Por padrão, `deploy_vm.sh`/`deploy_vm.ps1` recusam aplicar qualquer plano que altere ou exclua recursos já existentes — mesmo dentro do workspace certo (ex: você mudou `machine_type` de uma VM já criada sem querer). Se a alteração/exclusão for **intencional**, rode explicitamente:
+
+```bash
+bash deploy_vm.sh --allow-destructive
+```
+```powershell
+.\deploy_vm.ps1 -AllowDestructive
+```
+
+O script vai listar as mudanças destrutivas e pedir que você digite `CONFIRMAR` antes de prosseguir. Sem essa flag e sem essa confirmação, nada além de criação passa.
+
+Há também uma trava a nível do próprio Terraform (`main.tf`): se o workspace ativo não bater com o `workspace_name` do `terraform.tfvars`, o `plan`/`apply` falha imediatamente com um erro explicativo — protegendo contra um `terraform apply` manual rodado sem passar pelo script, no workspace errado.
+
+### Comandos úteis para gerenciar workspaces manualmente
+
+```bash
+terraform workspace list              # lista todos os workspaces (VMs) já criados
+terraform workspace select <nome>     # muda para o workspace de uma VM específica
+terraform workspace new <nome>        # cria um workspace novo (nova VM)
+```
 
 ## Alertas via Telegram (Opcional)
 

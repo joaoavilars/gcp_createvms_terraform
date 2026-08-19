@@ -2,95 +2,82 @@
 
 ## ⚠️ PROTEÇÕES IMPLEMENTADAS
 
-### 1. **Proteção contra destruição acidental**
-- `prevent_destroy = true` em `main.tf` bloqueia destruição de VMs e IPs
-- Scripts **SEMPRE** executam `terraform plan` antes de apply
-- Confirmação **MANUAL OBRIGATÓRIA** digitando "SIM"
+### 1. **Isolamento de state por Terraform Workspace**
+- Cada VM/projeto usa um `workspace_name` próprio (definido em `terraform.tfvars`)
+- `deploy_vm.ps1` / `deploy_vm.sh` selecionam (ou criam) esse workspace automaticamente
+- O state de uma VM fica isolado do state de qualquer outra: um apply nunca lê nem
+  substitui o state de outro projeto/VM
+- `main.tf` tem uma `precondition` que bloqueia o apply se o workspace ativo não
+  bater com o `workspace_name` declarado no `tfvars`
 
-### 2. **Exibição clara do que será feito**
-- Plan mostra:
-  - `+` recursos que serão **CRIADOS**
-  - `~` recursos que serão **MODIFICADOS**
-  - `-` recursos que serão **DESTRUÍDOS** ⚠️
+### 2. **Bloqueio automático de alterações/exclusões**
+- Os scripts são **somente para criação** por padrão
+- Sempre rodam `terraform plan` antes de qualquer apply
+- Se o plano contiver qualquer `update` ou `delete` em recursos já existentes,
+  o apply é **bloqueado automaticamente** — nada é aplicado
+- Para prosseguir mesmo assim, é preciso rodar com `--allow-destructive`
+  (`.sh`) ou `-AllowDestructive` (`.ps1`) **e** digitar `CONFIRMAR` no terminal
 
-### 3. **Validação de projeto e VM**
-- Scripts exibem projeto e VM de destino ANTES de executar
-- Você confirma visualmente antes de qualquer mudança
+### 3. **Validação e alertas**
+- Scripts exigem `terraform`/`jq` (ou `terraform` no PowerShell) no PATH
+- Notificam início, bloqueio, confirmação manual e resultado via Telegram
+  (se `enable_telegram_alerts = true` no `tfvars`)
 
 ---
 
 ## 📋 WORKFLOW CORRETO
 
-### **Cenário 1: Criar PRIMEIRA VM**
+### **Cenário 1: Criar uma VM nova**
 
 ```powershell
-# 1. Edite terraform.tfvars com dados da VM
-# 2. Execute deploy
+# 1. Copie terraform.tfvars.example para terraform.tfvars
+# 2. Preencha project_id, vm_name e um workspace_name ÚNICO
+#    (sugestão: "<project_id>-<vm_name>")
+# 3. Execute o deploy
 .\deploy_vm.ps1
 
-# 3. Revise o plan mostrado
-# 4. Digite "SIM" para confirmar
-# 5. VM criada com sucesso!
+# O script seleciona/cria o workspace, gera o plan e, como é
+# 100% criação, aplica direto.
+```
+
+```bash
+./deploy_vm.sh
 ```
 
 ---
 
-### **Cenário 2: Criar SEGUNDA VM (projeto/VM diferente)**
+### **Cenário 2: Criar outra VM (projeto/VM diferente)**
 
 ```powershell
-# 1. Edite terraform.tfvars com dados da NOVA VM
-project_id = "consigaz-270221"
-vm_name = "consigazprod"
-# ... outras configs
+# 1. Edite terraform.tfvars com os dados da NOVA VM e um workspace_name
+#    diferente do usado pela VM anterior
+project_id     = "consigaz-270221"
+vm_name        = "consigazprod"
+workspace_name = "consigaz-270221-consigazprod"
 
-# 2. Execute deploy normalmente
+# 2. Execute o deploy normalmente
 .\deploy_vm.ps1
-
-# O próprio script detecta que o state aponta para uma VM diferente e:
-# - Avisa: "VM ANTERIOR DETECTADA NO STATE - REMOVENDO AUTOMATICAMENTE"
-# - Faz backup do state (terraform.tfstate.backup-YYYYMMDD-HHMMSS)
-# - Remove a VM antiga do state (state rm) — ela NÃO é destruída no GCP,
-#   apenas deixa de ser gerenciada pelo Terraform
-# - Segue para o plan/apply normalmente
-
-# 3. Revise o plan, digite "SIM"
-# 4. Nova VM criada!
 ```
 
-> Não é mais necessário rodar `reset_state.ps1`/`reset_state.sh` manualmente antes de criar
-> uma VM diferente — `deploy_vm` faz isso sozinho, pois o propósito do script é sempre
-> criar uma VM nova. Os scripts `reset_state.*` continuam disponíveis para uso manual,
-> caso você queira "soltar" uma VM do controle do Terraform sem rodar um deploy em seguida.
+> Como cada VM tem seu próprio workspace, não existe risco de o apply de uma VM
+> nova mexer no state de uma VM já existente — cada uma vive em seu state isolado.
+> Não é necessário rodar nenhum script de limpeza de state entre uma VM e outra.
 
 ---
 
-### **Cenário 3: Modificar VM EXISTENTE (mesma VM)**
+### **Cenário 3: Modificar VM EXISTENTE (mesmo workspace)**
 
 ```powershell
-# 1. Edite terraform.tfvars alterando APENAS configs (RAM, disco, etc)
-# NÃO mude project_id ou vm_name
-
-# 2. Execute deploy
+# 1. Selecione/garanta o mesmo workspace_name já usado por essa VM
+# 2. Edite terraform.tfvars alterando as configs desejadas (RAM, disco, etc)
+# 3. Execute o deploy
 .\deploy_vm.ps1
 
-# 3. Plan mostra "~" (modificação) na VM existente
-# 4. Digite "SIM" para aplicar mudanças
+# Como o plano vai conter "update" na VM existente, o script BLOQUEIA
+# automaticamente e pede para rodar de novo com -AllowDestructive
+.\deploy_vm.ps1 -AllowDestructive
+# Digite CONFIRMAR quando solicitado
 ```
-
----
-
-## 🚨 ATENÇÃO: SITUAÇÕES DE RISCO
-
-### ✅ **Fluxo atual:**
-```powershell
-# Editar tfvars com os dados da VM (nova ou existente)
-.\deploy_vm.ps1    # <- detecta e limpa state antigo sozinho, se necessário
-```
-
-> Antes o processo exigia rodar `reset_state.ps1` manualmente antes de trocar de VM,
-> sob risco de o `deploy_vm.ps1` tentar destruir a VM antiga. Isso não é mais necessário:
-> o próprio `deploy_vm.ps1`/`.sh` remove a VM anterior do state automaticamente (com aviso
-> e backup) antes de criar a nova.
 
 ---
 
@@ -101,29 +88,29 @@ Terraform will perform the following actions:
 
   # google_compute_instance.vm_instance will be created
   + resource "google_compute_instance" "vm_instance" {
-      ✅ SEGURO - VM será CRIADA
+      ✅ SEGURO - VM será CRIADA (aplica direto, sem flag extra)
 
   # google_compute_instance.vm_instance will be updated in-place
   ~ resource "google_compute_instance" "vm_instance" {
-      ✅ SEGURO - VM será MODIFICADA (sem destruir)
+      ⚠️ BLOQUEADO por padrão - exige --allow-destructive/-AllowDestructive + CONFIRMAR
 
   # google_compute_instance.vm_instance will be destroyed
   - resource "google_compute_instance" "vm_instance" {
-      ⚠️ PERIGO - VM será DESTRUÍDA
-      
+      ⚠️ BLOQUEADO por padrão - exige --allow-destructive/-AllowDestructive + CONFIRMAR
+
   # google_compute_instance.vm_instance must be replaced
 -/+ resource "google_compute_instance" "vm_instance" {
-      ⚠️ PERIGO - VM será DESTRUÍDA e RECRIADA
+      ⚠️ BLOQUEADO por padrão - exige --allow-destructive/-AllowDestructive + CONFIRMAR
 ```
-
-**Se ver `-` ou `-/+`:** CANCELE e execute `reset_state.ps1` primeiro!
 
 ---
 
 ## 🛠️ COMANDOS ÚTEIS
 
-### Verificar state atual
+### Verificar workspace e state atual
 ```powershell
+terraform workspace list
+terraform workspace show
 terraform state list
 terraform show
 ```
@@ -133,19 +120,22 @@ terraform show
 gcloud compute instances list --project=SEU-PROJETO
 ```
 
-### Recuperar de backup do state
+### Soltar uma VM do controle do Terraform sem destruí-la (uso manual/pontual)
 ```powershell
-# Se fez besteira, restaura backup
-Copy-Item terraform.tfstate.backup-YYYYMMDD-HHMMSS terraform.tfstate -Force
+.\reset_state.ps1   # ou ./reset_state.sh no Linux
 ```
+> Continua disponível para casos em que você queira remover recursos do state
+> do workspace atual sem rodar um novo apply em seguida (faz backup do state
+> antes de remover). No fluxo normal, como cada VM já tem seu workspace
+> isolado, isso raramente é necessário.
 
 ---
 
 ## 📞 EMERGÊNCIA: VM FOI DESTRUÍDA
 
 1. **Verifique backups automáticos do GCP** (se configurado)
-2. **Verifique snapshots de disco** no console GCP
-3. **Restaure de backup manual** (se tiver)
+2. **Verifique snapshots de disco** no console GCP (veja `snapshot_config/`)
+3. **Restaure a partir de snapshot** usando o módulo `restore_vm/`
 4. **Entre em contato com suporte GCP** para possível recuperação
 
 **Lição:** Sempre configure snapshots automáticos para VMs críticas!
@@ -154,10 +144,11 @@ Copy-Item terraform.tfstate.backup-YYYYMMDD-HHMMSS terraform.tfstate -Force
 
 ## ✅ CHECKLIST PRÉ-DEPLOY
 
+- [ ] `workspace_name` no `terraform.tfvars` é único para esta VM/projeto
 - [ ] Li o `terraform plan` completamente
-- [ ] Verifiquei se NÃO há recursos com `-` (destruição)
-- [ ] Confirmei projeto e VM de destino
-- [ ] Se mudei projeto/VM, executei `reset_state.ps1` ANTES
-- [ ] Tenho backup da VM atual (se aplicável)
+- [ ] Se o plano só mostra `+` (criação), pode aplicar direto
+- [ ] Se o plano mostra `~`, `-` ou `-/+`, confirmei que é intencional antes
+      de rodar com `--allow-destructive`/`-AllowDestructive`
+- [ ] Tenho snapshot/backup da VM atual (se aplicável)
 
-**Só digite "SIM" se TODOS os itens estiverem ✅**
+**Só digite `CONFIRMAR` se TODOS os itens estiverem ✅**

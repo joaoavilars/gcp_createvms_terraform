@@ -8,6 +8,12 @@ provider "google" {
 resource "google_compute_address" "static_ip" {
   name   = "${var.vm_name}-static-ip"
   region = var.region
+  
+  # PROTEÇÃO CRÍTICA: Impede destruição acidental do IP estático
+  lifecycle {
+    prevent_destroy = true
+    create_before_destroy = true
+  }
 }
 
 locals {
@@ -55,10 +61,14 @@ resource "google_compute_instance" "vm_instance" {
   # Conta de serviço segue a padrão (Compute Engine default service account), então o bloco 'service_account' é omitido
 
   # Ignorar alterações de chaves SSH para não recriar a máquina via pipeline inadvertidamente
+  # PROTEÇÃO CRÍTICA: Impede destruição acidental da VM
   lifecycle {
     ignore_changes = [
       metadata["ssh-keys"]
     ]
+    prevent_destroy = true
+    # Se precisar substituir, cria a nova ANTES de deletar a antiga
+    create_before_destroy = true
   }
 }
 

@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dos2unix --version)"
+      "Bash(dos2unix --version)",
+      "Bash(terraform state *)",
+      "Bash(gcloud config *)",
+      "Bash(gcloud compute *)",
+      "Bash(terraform version *)",
+      "Bash(chmod +x \".terraform/providers/registry.terraform.io/hashicorp/google/7.25.0/linux_amd64/terraform-provider-google_v7.25.0_x5\")"
     ]
   }
 }

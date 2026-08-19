@@ -1,0 +1,62 @@
+# ================================================================================
+# EXEMPLO DE CONFIGURAÇÃO - RESTAURAÇÃO DE VM A PARTIR DE SNAPSHOT
+# ================================================================================
+# Copie este arquivo para "terraform.tfvars" e preencha com seus dados.
+# ================================================================================
+
+# ================================================================================
+# PROJETO E LOCALIZAÇÃO
+# ================================================================================
+project_id = "SEU-PROJETO-ID"
+region     = "us-east1"
+zone       = "us-east1-c"
+
+# ================================================================================
+# IDENTIFICAÇÃO DA VM
+# ================================================================================
+vm_name = "nome-da-vm-restaurada"
+
+# ================================================================================
+# SNAPSHOT E IP ESTÁTICO
+# ================================================================================
+# Nome da snapshot no GCP (obrigatório)
+snapshot_name = "nome-da-snapshot"
+
+# Nome do IP estático existente (opcional)
+# Se deixar vazio "", um IP novo será criado automaticamente
+static_ip_name = "nome-do-ip-existente"
+
+# ================================================================================
+# TIPO DE MÁQUINA
+# ================================================================================
+# Modelos padrões: machine_cpus * 4 = machine_ram
+# Exemplos:
+#   e2-standard-2 → machine_model_base="e2", machine_cpus=2, machine_ram=8
+#   t2d-standard-4 → machine_model_base="t2d", machine_cpus=4, machine_ram=16
+#
+# Modelos customizados:
+#   e2-custom-2-4096 → machine_model_base="e2", machine_cpus=2, machine_ram=4
+#   n2-custom-8-65536 → machine_model_base="n2", machine_cpus=8, machine_ram=64
+# ================================================================================
+machine_model_base = "e2"
+machine_cpus       = 2
+machine_ram        = 8
+
+# ================================================================================
+# DISCO DE BOOT
+# ================================================================================
+# Tamanho: 0 = usa tamanho da snapshot, >0 = expande disco
+boot_disk_size = 0
+boot_disk_type = "pd-balanced"
+
+# ================================================================================
+# CHAVES SSH
+# ================================================================================
+ssh_key = "usuario:ssh-rsa AAAA... usuario"
+
+# ================================================================================
+# ALERTAS DO TELEGRAM (opcional)
+# ================================================================================
+enable_telegram_alerts = false
+telegram_bot_token     = ""
+telegram_chat_id       = ""

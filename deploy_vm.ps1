@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Script para provisionar VMs no GCP via Terraform e notificar via Telegram.
 
@@ -91,20 +91,20 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Iniciando provisionamento..." -ForegroundColor Cyan
 Send-TelegramAlert -Message "🚀 <b>GCP:</b> Inicio do processo de provisionamento (workspace: <b>$workspaceName</b>)..."
 
-$planFile = New-TemporaryFile
-$planJsonFile = New-TemporaryFile
+$planFile = [System.IO.Path]::GetTempFileName()
+$planJsonFile = [System.IO.Path]::GetTempFileName()
 
 try {
     Write-Host "Calculando plano (terraform plan)..." -ForegroundColor Cyan
-    & terraform plan -input=false -out=$planFile.FullName
+    & terraform plan -input=false "-out=$planFile"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Erro ao gerar o plano do Terraform." -ForegroundColor Red
         Send-TelegramAlert -Message "❌ <b>GCP:</b> Erro ao gerar o plano do Terraform (workspace: $workspaceName)."
         exit 1
     }
 
-    & terraform show -json $planFile.FullName | Out-File -Encoding utf8 $planJsonFile.FullName
-    $planData = Get-Content $planJsonFile.FullName -Raw | ConvertFrom-Json
+    & terraform show -json $planFile | Out-File -Encoding utf8 $planJsonFile
+    $planData = Get-Content $planJsonFile -Raw | ConvertFrom-Json
 
     $destructive = @()
     foreach ($rc in $planData.resource_changes) {
@@ -136,7 +136,7 @@ try {
     }
 
     Write-Host "Executando terraform apply..." -ForegroundColor Cyan
-    & terraform apply -input=false $planFile.FullName
+    & terraform apply -input=false $planFile
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Terraform finalizado com sucesso." -ForegroundColor Green
         Send-TelegramAlert -Message "✅ <b>GCP:</b> Sucesso! Criacao/atualizacao concluida (workspace: $workspaceName)."
@@ -146,5 +146,5 @@ try {
         exit $LASTEXITCODE
     }
 } finally {
-    Remove-Item -Force $planFile.FullName, $planJsonFile.FullName -ErrorAction SilentlyContinue
+    Remove-Item -Force $planFile, $planJsonFile -ErrorAction SilentlyContinue
 }

@@ -1,0 +1,59 @@
+# terraform.tfvars.example
+# Copie para 'terraform.tfvars' e preencha com os dados da VM a ser recriada.
+# (arquivo real é ignorado pelo git — ver .gitignore na raiz do repositório)
+
+# ================================================================================
+# Este módulo RECRIA uma VM já existente com um novo SO, mantendo o mesmo
+# nome, o mesmo IP externo (reservado) e o mesmo IP interno.
+#
+# 'vm_name' abaixo é usado tanto para localizar a VM ANTIGA (que o
+# upgrade_vm.sh vai excluir) quanto para nomear a VM NOVA (criada pelo
+# terraform apply) — ou seja, pressupõe recriar com o MESMO nome.
+#
+# Os IPs (externo reservado e interno fixo) NÃO são preenchidos aqui — o
+# upgrade_vm.sh descobre e captura os dois automaticamente a partir da VM
+# antiga (via 'gcloud compute instances describe') ANTES de excluí-la, e
+# repassa para o 'terraform apply' na hora. Se for rodar o terraform manualmente
+# (sem o script), passe-os com '-var existing_static_ip=... -var network_ip=...'.
+# ================================================================================
+
+# Id do Projeto
+project_id = "nacionalgas"
+
+# Região e Zona (iguais às da VM antiga)
+region = "southamerica-east1"
+zone   = "southamerica-east1-a"
+
+# Nome da VM (igual ao nome antigo — vai ser excluído e recriado com este mesmo nome)
+vm_name = "nacionalgas-prd-br-t2d"
+
+# Nome do Workspace do Terraform (isola o state desta VM das demais)
+workspace_name = "nacionalgas-prd-br-t2d-upgrade"
+
+# Tipo de máquina (mantenha igual ao da VM antiga, a menos que também queira
+# trocar o tamanho da VM nesta operação — ver 'gcloud compute instances describe')
+machine_type = "t2d-standard-2"
+
+# Sistema Operacional NOVO (o motivo desta recriação)
+# Comando CLI para listar imagens do Ubuntu disponíveis:
+# $ gcloud compute images list --project ubuntu-os-cloud --no-standard-images
+os_image = "ubuntu-os-cloud/ubuntu-2604-lts-amd64"
+
+# Tamanho e Tipo de Disco (mantenha igual ao da VM antiga, a menos que queira
+# redimensionar aqui também)
+boot_disk_size = 300
+boot_disk_type = "pd-balanced"
+
+# Tags de firewall/rede (confira as da VM antiga com 'gcloud compute instances describe';
+# o padrão abaixo é o mesmo do módulo de criação — ajuste se a VM antiga tinha tags diferentes)
+tags = ["http-server", "https-server"]
+
+# Chave SSH fornecida
+ssh_key = "softmovel:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5rqh6HwfGU/WL0FhK+mgkirTTcHP6MchnIphd2QASqVPCjkZqc/LZo8H8Hjd3vaV8yVLsZprSPBb5MRI63lRUi4Lp03jk2I+090PToYKrFXg3eFiDibgX3paZnqaHHRGACx+Oz0R/+M8GYHtXa0getVes7m9UZwXzI26lK1fs9pn7hvDiJTYjarbrDutmyV9Kv0UGVIjsu83zjZECxwpp+/O6rki5Q1x06eikLFwV5PcImMnfEm8trCKQhWhvFJoTaQHDhWWrnZ2stsoLaZMcUB5rN3mXk3EMWZkomQh6kpZyKmf+xBgni/GkbRtDewESFRe1cEvw4/RWlzAWsYNF softmovel"
+
+# ================================================================================
+# ALERTAS DO TELEGRAM (opcional)
+# ================================================================================
+enable_telegram_alerts = false
+telegram_bot_token     = ""
+telegram_chat_id       = ""

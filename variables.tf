@@ -69,3 +69,21 @@ variable "workspace_name" {
   description = "Nome do Terraform Workspace usado para isolar o state desta VM/projeto. Cada VM deve ter um workspace próprio e ÚNICO (ex: '<project_id>-<vm_name>'), garantindo que o apply de uma VM nunca leia ou altere o state de outra. Use 'default' apenas para a VM clássica que já existia antes desta trava."
   type        = string
 }
+
+variable "create_extra_disk" {
+  description = "Define se um disco extra deve ser criado e anexado à VM"
+  type        = bool
+  default     = false
+}
+
+variable "extra_disk_size" {
+  description = "Tamanho do disco extra em GB"
+  type        = number
+  default     = 50
+}
+
+variable "extra_disk_type" {
+  description = "Tipo do disco extra (pd-balanced, etc)"
+  type        = string
+  default     = "pd-balanced"
+}

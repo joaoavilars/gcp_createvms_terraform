@@ -8,6 +8,11 @@ provider "google" {
 resource "google_compute_address" "static_ip" {
   name   = "${var.vm_name}-static-ip"
   region = var.region
+
+  # PROTEÇÃO CRÍTICA: Impede destruição acidental do IP estático
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Criação da VM
@@ -47,8 +52,14 @@ resource "google_compute_instance" "vm_instance" {
   # Ignorar alterações de chaves SSH para não recriar a máquina via pipeline inadvertidamente
   lifecycle {
     ignore_changes = [
-      metadata["ssh-keys"]
+      metadata["ssh-keys"],
+      # O disco extra é anexado por google_compute_attached_disk; sem isso o
+      # Terraform enxergaria o disco como alteração na VM
+      attached_disk
     ]
+
+    # PROTEÇÃO CRÍTICA: Impede destruição acidental da VM
+    prevent_destroy = true
 
     # Trava de segurança: garante que o workspace ativo é o mesmo declarado em
     # workspace_name no terraform.tfvars. Cada VM tem seu próprio workspace/state;
@@ -59,4 +70,25 @@ resource "google_compute_instance" "vm_instance" {
       error_message = "Workspace ativo ('${terraform.workspace}') difere de 'workspace_name' no terraform.tfvars ('${var.workspace_name}'). Rode 'terraform workspace select ${var.workspace_name}' (o deploy_vm.sh faz isso automaticamente) antes de aplicar."
     }
   }
+}
+
+# Criação do Disco Extra (Condicional)
+resource "google_compute_disk" "extra_disk" {
+  count = var.create_extra_disk ? 1 : 0
+  name  = "${var.vm_name}-extra-disk"
+  type  = var.extra_disk_type
+  size  = var.extra_disk_size
+  zone  = var.zone
+
+  # PROTEÇÃO CRÍTICA: o disco extra guarda dados
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Anexar o Disco Extra na VM (Condicional)
+resource "google_compute_attached_disk" "attach_extra_disk" {
+  count    = var.create_extra_disk ? 1 : 0
+  disk     = google_compute_disk.extra_disk[0].id
+  instance = google_compute_instance.vm_instance.id
 }
